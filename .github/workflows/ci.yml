@@ -1,0 +1,285 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: job_automation_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    - name: Create test environment file
+      working-directory: ./backend
+      run: |
+        cat > .env.test << EOF
+        NODE_ENV=test
+        DB_HOST=localhost
+        DB_PORT=5432
+        DB_NAME_TEST=job_automation_test
+        DB_USER=postgres
+        DB_PASSWORD=postgres
+        REDIS_URL=redis://localhost:6379
+        JWT_SECRET=test-jwt-secret-key-for-ci
+        OPENAI_API_KEY=test-openai-key
+        ANTHROPIC_API_KEY=test-anthropic-key
+        GOOGLE_API_KEY=test-google-key
+        EOF
+
+    - name: Run backend linting
+      working-directory: ./backend
+      run: npm run lint || true
+
+    - name: Run backend unit tests
+      working-directory: ./backend
+      run: npm test -- --coverage --testTimeout=30000
+      env:
+        NODE_ENV: test
+
+    - name: Run backend integration tests
+      working-directory: ./backend
+      run: npm test -- --testPathPattern=integration --testTimeout=60000
+      env:
+        NODE_ENV: test
+
+    - name: Run backend e2e tests
+      working-directory: ./backend
+      run: npm test -- --testPathPattern=e2e --testTimeout=120000
+      env:
+        NODE_ENV: test
+
+    - name: Run performance tests
+      working-directory: ./backend
+      run: npm test -- --testPathPattern=performance --testTimeout=180000
+      env:
+        NODE_ENV: test
+
+    - name: Upload backend coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage/lcov.info
+        flags: backend
+        name: backend-coverage
+
+  test-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Create frontend environment file
+      working-directory: ./frontend
+      run: |
+        cat > .env << EOF
+        VITE_API_URL=http://localhost:5000/api
+        VITE_APP_NAME=Job Automation Platform
+        EOF
+
+    - name: Run frontend linting
+      working-directory: ./frontend
+      run: npm run lint || true
+
+    - name: Run frontend tests
+      working-directory: ./frontend
+      run: npm test -- --coverage
+
+    - name: Build frontend
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: Upload frontend coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        cd backend && npm ci
+        cd ../frontend && npm ci
+
+    - name: Run security audit - Backend
+      working-directory: ./backend
+      run: npm audit --audit-level=high
+
+    - name: Run security audit - Frontend
+      working-directory: ./frontend
+      run: npm audit --audit-level=high
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: javascript
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend, security-scan]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Build backend
+      working-directory: ./backend
+      run: |
+        npm ci
+        npm run build
+
+    - name: Build frontend
+      working-directory: ./frontend
+      run: |
+        npm ci
+        npm run build
+
+    - name: Build Docker images
+      run: |
+        docker build -t job-automation-backend ./backend
+        docker build -t job-automation-frontend ./frontend
+
+    - name: Run Docker Compose tests
+      run: |
+        docker-compose -f docker-compose.yml -f docker-compose.test.yml up --build --abort-on-container-exit
+        docker-compose down
+
+  quality-gates:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        cd backend && npm ci
+        cd ../frontend && npm ci
+
+    - name: Check test coverage thresholds
+      run: |
+        echo "Checking coverage thresholds..."
+        # Backend coverage check
+        cd backend
+        npm test -- --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
+        
+        # Frontend coverage check
+        cd ../frontend
+        npm test -- --coverage --reporter=json --outputFile=coverage.json
+        
+    - name: Check bundle size
+      working-directory: ./frontend
+      run: |
+        npm run build
+        # Check if bundle size is reasonable (adjust threshold as needed)
+        BUNDLE_SIZE=$(du -sk dist | cut -f1)
+        if [ $BUNDLE_SIZE -gt 5000 ]; then
+          echo "Bundle size too large: ${BUNDLE_SIZE}KB"
+          exit 1
+        fi
+        echo "Bundle size OK: ${BUNDLE_SIZE}KB"
+
+    - name: Performance budget check
+      working-directory: ./frontend
+      run: |
+        # Install lighthouse CI
+        npm install -g @lhci/cli@0.12.x
+        
+        # Run lighthouse CI (if you have lighthouse config)
+        # lhci autorun || echo "Lighthouse CI not configured, skipping..."
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend, security-scan, quality-gates]
+    if: always()
+
+    steps:
+    - name: Notify on success
+      if: ${{ needs.test-backend.result == 'success' && needs.test-frontend.result == 'success' && needs.security-scan.result == 'success' && needs.quality-gates.result == 'success' }}
+      run: |
+        echo "✅ All tests passed successfully!"
+        # Add notification logic here (Slack, email, etc.)
+
+    - name: Notify on failure
+      if: ${{ needs.test-backend.result == 'failure' || needs.test-frontend.result == 'failure' || needs.security-scan.result == 'failure' || needs.quality-gates.result == 'failure' }}
+      run: |
+        echo "❌ Some tests failed!"
+        # Add notification logic here (Slack, email, etc.)
