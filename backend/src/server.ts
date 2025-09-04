@@ -9,6 +9,7 @@ import jobsRoutes from './routes/jobs';
 import applicationsRoutes from './routes/applications';
 import pipelineRoutes from './routes/pipeline';
 import dashboardRoutes from './routes/dashboard';
+import scrapingRoutes from './routes/scraping';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { logger } from './config/logger';
 import { JobQueueService } from './services/jobQueue';
@@ -38,6 +39,7 @@ app.use('/api/jobs', jobsRoutes);
 app.use('/api/applications', applicationsRoutes);
 app.use('/api/pipeline', pipelineRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/scraping', scrapingRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
