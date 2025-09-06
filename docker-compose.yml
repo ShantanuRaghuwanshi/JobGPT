@@ -1,37 +1,81 @@
 services:
   postgres:
-    image: postgres:alpine
+    image: postgres:17-alpine
     container_name: job_automation_postgres
     environment:
       POSTGRES_DB: job_automation
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_HOST_AUTH_METHOD: md5
+    restart: always
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     container_name: job_automation_redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Optional: Redis Commander for Redis GUI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: job_automation_backend
+    environment:
+      NODE_ENV: development
+      PORT: 5001
+      FRONTEND_URL: http://localhost:5173
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: job_automation
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: job_automation_frontend
+    environment:
+      VITE_API_URL: http://localhost:5001/api
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: job_automation_redis_commander
@@ -44,7 +88,6 @@ services:
     profiles:
       - tools
 
-  # Optional: pgAdmin for PostgreSQL GUI
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: job_automation_pgadmin
@@ -61,3 +104,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+

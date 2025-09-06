@@ -1,7 +1,10 @@
+// Load environment variables BEFORE any other imports that may read them
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
 import llmRoutes from './routes/llm';
@@ -15,9 +18,6 @@ import { logger } from './config/logger';
 import { JobQueueService } from './services/jobQueue';
 import { JobRepository } from './database/repositories/job';
 import db from './database/connection';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -51,36 +51,36 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Initialize job queue service for automatic scraping
-let jobQueueService: JobQueueService | null = null;
+// let jobQueueService: JobQueueService | null = null;
 
-async function initializeJobQueue() {
-    try {
-        const jobRepository = new JobRepository();
-        // Get the pool from the database connection
-        const pool = db.getPool();
-        jobQueueService = new JobQueueService(jobRepository, pool);
+// async function initializeJobQueue() {
+//     try {
+//         const jobRepository = new JobRepository();
+//         // Get the pool from the database connection
+//         const pool = db.getPool();
+//         jobQueueService = new JobQueueService(jobRepository, pool);
 
-        // Set up recurring job crawling (every 6 hours)
-        jobQueueService.setupRecurringCrawling();
+//         // Set up recurring job crawling (every 6 hours)
+//         jobQueueService.setupRecurringCrawling();
 
-        logger.info('✅ Job queue service initialized with recurring crawling');
-    } catch (error) {
-        logger.error('❌ Failed to initialize job queue service:', error);
-    }
-}
+//         logger.info('✅ Job queue service initialized with recurring crawling');
+//     } catch (error) {
+//         logger.error('❌ Failed to initialize job queue service:', error);
+//     }
+// }
 
 // Graceful shutdown handler
 async function gracefulShutdown(signal: string) {
     logger.info(`🛑 Received ${signal}, shutting down gracefully...`);
 
-    if (jobQueueService) {
-        try {
-            await jobQueueService.cleanup();
-            logger.info('✅ Job queue service cleaned up');
-        } catch (error) {
-            logger.error('❌ Error cleaning up job queue service:', error);
-        }
-    }
+    // if (jobQueueService) {
+    //     try {
+    //         await jobQueueService.cleanup();
+    //         logger.info('✅ Job queue service cleaned up');
+    //     } catch (error) {
+    //         logger.error('❌ Error cleaning up job queue service:', error);
+    //     }
+    // }
 
     process.exit(0);
 }
@@ -96,7 +96,7 @@ if (require.main === module) {
         logger.info(`📊 Health check: http://localhost:${PORT}/api/health`);
 
         // Initialize job queue after server starts
-        await initializeJobQueue();
+        // await initializeJobQueue();
     });
 }
 

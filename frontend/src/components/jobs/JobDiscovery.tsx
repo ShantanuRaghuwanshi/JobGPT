@@ -107,6 +107,12 @@ export function JobDiscovery({ initialCategory = 'matches' }: JobDiscoveryProps)
         }
     };
 
+    // Sync search input from child
+    const handleSearchInputChange = (value: string) => {
+        setSearchQuery(value);
+    };
+
+    // Called when search button is pressed
     const handleSearch = (query: string) => {
         setSearchQuery(query);
         setFilters(prev => ({ ...prev, offset: 0 }));
@@ -269,6 +275,8 @@ export function JobDiscovery({ initialCategory = 'matches' }: JobDiscoveryProps)
                     filters={filters}
                     onFiltersChange={handleFiltersChange}
                     onSearch={handleSearch}
+                    searchQuery={searchQuery}
+                    onSearchInputChange={handleSearchInputChange}
                     isLoading={matchesLoading || allJobsLoading}
                 />
             )}

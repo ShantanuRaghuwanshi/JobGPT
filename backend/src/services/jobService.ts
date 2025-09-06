@@ -110,18 +110,20 @@ export class JobService {
     }
 
     /**
-     * Search jobs by text query
+     * Search jobs by text query with fuzzy matching
      */
     async searchJobs(query: string, filters: Omit<JobFilters, 'title'> = {}): Promise<JobSearchResult> {
         try {
+            // Use fuzzy search on multiple fields
             const searchFilters: JobFilters = {
                 ...filters,
                 title: query
             };
 
-            // Also search in company names and descriptions
+            // Get jobs with fuzzy title matching (handled by repository)
             const titleResults = await this.getJobs(searchFilters);
 
+            // Also search in company names
             const companyResults = await this.getJobs({
                 ...filters,
                 company: query
@@ -131,6 +133,7 @@ export class JobService {
             const allJobs = [...titleResults.jobs];
             const seenIds = new Set(titleResults.jobs.map(job => job.id));
 
+            // Add company results that weren't already found in title search
             for (const job of companyResults.jobs) {
                 if (!seenIds.has(job.id)) {
                     allJobs.push(job);
@@ -138,25 +141,17 @@ export class JobService {
                 }
             }
 
-            // Sort by relevance (jobs matching title first, then company)
-            allJobs.sort((a, b) => {
-                const aMatchesTitle = a.title.toLowerCase().includes(query.toLowerCase());
-                const bMatchesTitle = b.title.toLowerCase().includes(query.toLowerCase());
-
-                if (aMatchesTitle && !bMatchesTitle) return -1;
-                if (!aMatchesTitle && bMatchesTitle) return 1;
-
-                return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-            });
-
+            // Apply pagination to the combined results
             const limit = filters.limit || 20;
             const offset = filters.offset || 0;
             const paginatedJobs = allJobs.slice(offset, offset + limit);
 
-            logger.info('Job search completed', {
+            logger.info('Job search completed with fuzzy matching', {
                 query,
                 totalResults: allJobs.length,
-                returnedResults: paginatedJobs.length
+                returnedResults: paginatedJobs.length,
+                titleMatches: titleResults.jobs.length,
+                companyMatches: companyResults.jobs.length
             });
 
             return {
