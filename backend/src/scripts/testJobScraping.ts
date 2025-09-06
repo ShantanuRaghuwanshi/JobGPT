@@ -1,12 +1,12 @@
 #!/usr/bin/env ts-node
 
+// Load environment variables FIRST before any other imports
 import dotenv from 'dotenv';
+dotenv.config();
+
 import { JobAutomationService } from '../services/jobAutomation';
 import db from '../database/connection';
 import { logger } from '../config/logger';
-
-// Load environment variables
-dotenv.config();
 
 async function testJobScraping() {
     const client = await db.getPool().connect();

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
+// Load environment variables FIRST before any other imports
 import dotenv from 'dotenv';
-import db from '../database/connection';
-
-// Load environment variables
 dotenv.config();
+
+import db from '../database/connection';
 
 async function testDatabaseConnection() {
     try {

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
+// Load environment variables FIRST before any other imports
 import dotenv from 'dotenv';
+dotenv.config();
+
 import MigrationRunner from '../database/migrations/runner';
 import db from '../database/connection';
-
-// Load environment variables
-dotenv.config();
 
 async function runMigrations() {
     const runner = new MigrationRunner();

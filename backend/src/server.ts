@@ -1,7 +1,10 @@
+// Load environment variables FIRST before any other imports
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
 import llmRoutes from './routes/llm';
@@ -15,9 +18,6 @@ import { logger } from './config/logger';
 import { JobQueueService } from './services/jobQueue';
 import { JobRepository } from './database/repositories/job';
 import db from './database/connection';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -70,34 +70,48 @@ async function initializeJobQueue() {
 }
 
 // Graceful shutdown handler
-async function gracefulShutdown(signal: string) {
-    logger.info(`🛑 Received ${signal}, shutting down gracefully...`);
+// async function gracefulShutdown(signal: string) {
+//     logger.info(`🛑 Received ${signal}, shutting down gracefully...`);
 
-    if (jobQueueService) {
-        try {
-            await jobQueueService.cleanup();
-            logger.info('✅ Job queue service cleaned up');
-        } catch (error) {
-            logger.error('❌ Error cleaning up job queue service:', error);
-        }
-    }
+//     if (jobQueueService) {
+//         try {
+//             await jobQueueService.cleanup();
+//             logger.info('✅ Job queue service cleaned up');
+//         } catch (error) {
+//             logger.error('❌ Error cleaning up job queue service:', error);
+//         }
+//     }
 
-    process.exit(0);
-}
+//     process.exit(0);
+// }
 
-// Register shutdown handlers
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+// // Register shutdown handlers
+// process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+// process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Only start server if this file is run directly
 if (require.main === module) {
-    app.listen(PORT, async () => {
-        logger.info(`🚀 Server running on port ${PORT}`);
-        logger.info(`📊 Health check: http://localhost:${PORT}/api/health`);
+    (async () => {
+        // Check DB connection before starting server
+        try {
+            const isDbConnected = await db.testConnection();
+            if (!isDbConnected) {
+                logger.error('❌ Database connection failed. Server startup aborted.');
+                process.exit(1);
+            }
+            logger.info('✅ Database connection successful.');
+        } catch (err) {
+            logger.error('❌ Error during database connection check:', err);
+            process.exit(1);
+        }
 
-        // Initialize job queue after server starts
-        await initializeJobQueue();
-    });
+        app.listen(PORT, () => {
+            logger.info(`🚀 Server running on port ${PORT}`);
+            logger.info(`📊 Health check: http://localhost:${PORT}/api/health`);
+            // Initialize job queue after server starts
+            // await initializeJobQueue();
+        });
+    })();
 }
 
 export default app;
