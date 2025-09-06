@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
+// Load environment variables FIRST before any other imports
 import dotenv from 'dotenv';
+dotenv.config();
+
 import bcrypt from 'bcrypt';
 import { userRepository, userProfileRepository, jobRepository } from '../database/repositories';
 import db from '../database/connection';
-
-// Load environment variables
-dotenv.config();
 
 async function seedDatabase() {
     try {

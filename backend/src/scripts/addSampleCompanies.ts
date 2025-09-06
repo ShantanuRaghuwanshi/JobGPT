@@ -1,11 +1,11 @@
 #!/usr/bin/env ts-node
 
+// Load environment variables FIRST before any other imports
 import dotenv from 'dotenv';
+dotenv.config();
+
 import db from '../database/connection';
 import { logger } from '../config/logger';
-
-// Load environment variables
-dotenv.config();
 
 const sampleCompanies = [
     {

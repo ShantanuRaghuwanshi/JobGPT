@@ -70,8 +70,8 @@ app.use(errorHandler);
 // }
 
 // Graceful shutdown handler
-async function gracefulShutdown(signal: string) {
-    logger.info(`🛑 Received ${signal}, shutting down gracefully...`);
+// async function gracefulShutdown(signal: string) {
+//     logger.info(`🛑 Received ${signal}, shutting down gracefully...`);
 
     // if (jobQueueService) {
     //     try {
@@ -82,19 +82,28 @@ async function gracefulShutdown(signal: string) {
     //     }
     // }
 
-    process.exit(0);
-}
+//     process.exit(0);
+// }
 
-// Register shutdown handlers
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+// // Register shutdown handlers
+// process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+// process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Only start server if this file is run directly
 if (require.main === module) {
-    app.listen(PORT, async () => {
-        logger.info(`🚀 Server running on port ${PORT}`);
-        logger.info(`📊 Health check: http://localhost:${PORT}/api/health`);
-
+    (async () => {
+        // Check DB connection before starting server
+        try {
+            const isDbConnected = await db.testConnection();
+            if (!isDbConnected) {
+                logger.error('❌ Database connection failed. Server startup aborted.');
+                process.exit(1);
+            }
+            logger.info('✅ Database connection successful.');
+        } catch (err) {
+            logger.error('❌ Error during database connection check:', err);
+            process.exit(1);
+        }
         // Initialize job queue after server starts
         // await initializeJobQueue();
     });
