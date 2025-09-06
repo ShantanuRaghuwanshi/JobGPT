@@ -209,11 +209,13 @@ export class JobRepository extends BaseRepository<Job, JobRow> {
             paramIndex++;
         }
 
-        // Handle title filter with case-insensitive contains
+        // Handle title filter with fuzzy matching using pg_trgm similarity
         if (filters.title?.contains) {
-            query += ` AND title ILIKE $${paramIndex}`;
+            // Use trigram similarity for fuzzy matching
+            query += ` AND (title ILIKE $${paramIndex} OR similarity(title, $${paramIndex + 1}) > 0.3)`;
             params.push(`%${filters.title.contains}%`);
-            paramIndex++;
+            params.push(filters.title.contains);
+            paramIndex += 2;
         }
 
         // Handle company filter with case-insensitive contains
@@ -255,8 +257,12 @@ export class JobRepository extends BaseRepository<Job, JobRow> {
             paramIndex++;
         }
 
-        // Handle ordering
-        if (options.orderBy?.updatedAt) {
+        // Handle ordering with similarity scoring for title search
+        if (filters.title?.contains) {
+            query += ` ORDER BY similarity(title, $${paramIndex}) DESC, updated_at DESC`;
+            params.push(filters.title.contains);
+            paramIndex++;
+        } else if (options.orderBy?.updatedAt) {
             query += ` ORDER BY updated_at ${options.orderBy.updatedAt.toUpperCase()}`;
         } else {
             query += ' ORDER BY updated_at DESC';
@@ -291,11 +297,13 @@ export class JobRepository extends BaseRepository<Job, JobRow> {
             paramIndex++;
         }
 
-        // Handle title filter with case-insensitive contains
+        // Handle title filter with fuzzy matching using pg_trgm similarity
         if (filters.title?.contains) {
-            query += ` AND title ILIKE $${paramIndex}`;
+            // Use trigram similarity for fuzzy matching
+            query += ` AND (title ILIKE $${paramIndex} OR similarity(title, $${paramIndex + 1}) > 0.3)`;
             params.push(`%${filters.title.contains}%`);
-            paramIndex++;
+            params.push(filters.title.contains);
+            paramIndex += 2;
         }
 
         // Handle company filter with case-insensitive contains

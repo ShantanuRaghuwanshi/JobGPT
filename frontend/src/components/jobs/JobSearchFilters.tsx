@@ -6,6 +6,8 @@ interface JobSearchFiltersProps {
     filters: JobFilters;
     onFiltersChange: (filters: JobFilters) => void;
     onSearch: (query: string) => void;
+    searchQuery: string;
+    onSearchInputChange: (value: string) => void;
     isLoading?: boolean;
 }
 
@@ -16,8 +18,7 @@ const experienceLevels: { value: ExperienceLevel; label: string }[] = [
     { value: 'lead', label: 'Lead Level' },
 ];
 
-export function JobSearchFilters({ filters, onFiltersChange, onSearch, isLoading = false }: JobSearchFiltersProps) {
-    const [searchQuery, setSearchQuery] = useState('');
+export function JobSearchFilters({ filters, onFiltersChange, onSearch, searchQuery, onSearchInputChange, isLoading = false }: JobSearchFiltersProps) {
     const [showFilters, setShowFilters] = useState(false);
     const [localFilters, setLocalFilters] = useState<JobFilters>(filters);
 
@@ -39,7 +40,7 @@ export function JobSearchFilters({ filters, onFiltersChange, onSearch, isLoading
         };
         setLocalFilters(clearedFilters);
         onFiltersChange(clearedFilters);
-        setSearchQuery('');
+        onSearchInputChange('');
     };
 
     const hasActiveFilters = () => {
@@ -62,7 +63,7 @@ export function JobSearchFilters({ filters, onFiltersChange, onSearch, isLoading
                     <input
                         type="text"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => onSearchInputChange(e.target.value)}
                         placeholder="Search jobs by title, company, or keywords..."
                         className="block w-full pl-10 pr-12 py-3 bg-dark-800/50 border border-dark-600 text-white placeholder-dark-400 rounded-lg focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                         disabled={isLoading}

@@ -52,7 +52,8 @@ const searchQuerySchema = Joi.object({
     limit: Joi.number().integer().min(1).max(100).default(20),
     offset: Joi.number().integer().min(0).default(0),
     experienceLevel: Joi.string().valid('entry', 'mid', 'senior', 'lead').optional(),
-    location: Joi.string().max(255).optional()
+    location: Joi.string().max(255).optional(),
+    isAvailable: Joi.boolean().optional()
 });
 
 const jobIdSchema = Joi.object({
@@ -330,6 +331,7 @@ router.get('/search', authenticateToken, async (req: Request, res: Response): Pr
         const filters: Omit<JobFilters, 'title'> = {
             experienceLevel: value.experienceLevel,
             location: value.location,
+            isAvailable: value.isAvailable,
             limit: value.limit,
             offset: value.offset
         };
